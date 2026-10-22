@@ -1,0 +1,111 @@
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local BOOST_MULTIPLIER = 2.5
+local BRAKE_MULTIPLIER = 2.5
+
+local boosting = false
+local brakeEnabled = false
+local braking = false
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "VehicleBoostStatus"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local label = Instance.new("TextLabel")
+label.Name = "BrakeStatus"
+label.Size = UDim2.new(0, 220, 0, 38)
+label.Position = UDim2.new(1, -235, 0, 20)
+label.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+label.BackgroundTransparency = 0.15
+label.BorderSizePixel = 0
+label.Font = Enum.Font.GothamBold
+label.TextSize = 15
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.Parent = gui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = label
+
+local function updateBrakeGui()
+    if brakeEnabled then
+        label.Text = "BRAKE MULTIPLIER: ON"
+        label.BackgroundColor3 = Color3.fromRGB(35, 135, 65)
+    else
+        label.Text = "BRAKE MULTIPLIER: OFF"
+        label.BackgroundColor3 = Color3.fromRGB(150, 45, 45)
+    end
+end
+
+updateBrakeGui()
+
+UIS.InputBegan:Connect(function(input, processed)
+    if processed then return end
+
+    if input.UserInputType == Enum.UserInputType.MouseButton3 then
+        boosting = true
+    elseif input.KeyCode == Enum.KeyCode.Equals then
+        brakeEnabled = not brakeEnabled
+        updateBrakeGui()
+    elseif input.KeyCode == Enum.KeyCode.S then
+        braking = true
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton3 then
+        boosting = false
+    elseif input.KeyCode == Enum.KeyCode.S then
+        braking = false
+    end
+end)
+
+UIS.WindowFocusReleased:Connect(function()
+    boosting = false
+    braking = false
+end)
+
+RunService.Heartbeat:Connect(function(dt)
+    local character = player.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    local seat = humanoid and humanoid.SeatPart
+
+    if not seat then return end
+
+    local vehicle = seat:FindFirstAncestorOfClass("Model")
+    local part = vehicle and vehicle.PrimaryPart
+
+    if not part then
+        part = seat
+    end
+
+    if not part:IsA("BasePart") then return end
+
+    local velocity = part.AssemblyLinearVelocity
+    local horizontal = Vector3.new(velocity.X, 0, velocity.Z)
+
+    if boosting and horizontal.Magnitude > 0 then
+        horizontal *= BOOST_MULTIPLIER ^ (dt * 2)
+    elseif boosting then
+        horizontal = Vector3.new(
+            part.CFrame.LookVector.X * 2,
+            0,
+            part.CFrame.LookVector.Z * 2
+        )
+    end
+
+    if brakeEnabled and braking then
+        horizontal *= math.max(0, 1 - BRAKE_MULTIPLIER * dt)
+    end
+
+    part.AssemblyLinearVelocity = Vector3.new(
+        horizontal.X,
+        velocity.Y,
+        horizontal.Z
+    )
+end)
